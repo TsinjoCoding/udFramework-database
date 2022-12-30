@@ -5,6 +5,7 @@ udFramework database is a java database framework that can communicates with any
 ## Installation
 
 you just need to add the jar in your lib folder or in your class path.
+[download jar](https://github.com/TsinjoCoding/udFramework-database/raw/main/udFramework-database.jar)
 
 ## Usage
 
