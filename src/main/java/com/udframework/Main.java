@@ -1,9 +1,9 @@
 package com.udframework;
 
-import com.udframework.bdd.connectionHandler.ConnectionHandler;
 
 public class Main {
-    public static void main(String[] args) throws Exception{
-        ConnectionHandler.getInstance();
+    public static void main(String[] args) {
+        System.out.println("Hello, udFramework!");
+        System.out.println("Copyright (c) 2022, TsinjoCoding");
     }
 }
