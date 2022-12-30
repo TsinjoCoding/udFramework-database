@@ -20,7 +20,7 @@ public class DBConnection implements ConnectionGetter {
 }
 ```
 ## step 2: map a class with your table
-Let's assume thatwe have a table 'person' and has these columns:
+Let's assume that we have a table 'person' which has these columns:
 - id
 - name
 - birthday
