@@ -348,19 +348,6 @@ public class DBObject<E extends DBObject<E, P>, P> implements DBValidation {
         return results;
     }
 
-    public String toJson() throws JsonProcessingException {
-        return mapper.writeValueAsString(this);
-    }
-
-    @Override
-    public String toString() {
-        try {
-            return toJson();
-        } catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
     public void setPk(String id) throws ReflectiveOperationException {
         this.pk.setValueIn(this, id);
     }
