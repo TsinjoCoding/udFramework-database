@@ -38,7 +38,7 @@ public class Temp<E extends DBObject> {
     }
 
     public Temp<E> where (String col, Object value) {
-        this.conditions.add(col + " = " + value);
+        this.conditions.add(col + " = '" + value + "'");
         return this;
     }
 
