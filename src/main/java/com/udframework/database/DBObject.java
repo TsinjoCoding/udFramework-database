@@ -1,7 +1,6 @@
 package com.udframework.database;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.udframework.database.annotations.ManyToMany;
 import com.udframework.database.annotations.OneToMany;
@@ -15,10 +14,7 @@ import com.udframework.database.generic.relationTypes.RelationType;
 import com.udframework.database.generic.utils.StringUtils;
 
 import java.lang.annotation.Annotation;
-import java.sql.Connection;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.HashMap;
 
@@ -32,13 +28,19 @@ public class DBObject<E extends DBObject<E, P>, P> implements DBValidation {
 
     @JsonIgnore
     protected final ClassMetadata classData;
+
     final FieldMetadata pk;
-    final String instanceSelect;
+    final String instanceSelect, instanceInsert;
 
     public DBObject() throws DatabaseException, NoSuchMethodException {
         classData = ClassMetadata.getMetadataOf(getClass());
         pk = classData.getPrimaryKey();
         instanceSelect = String.format(defaultSelect, classData.getAllColumns(), classData.getTableName());
+        instanceInsert = buildInstanceInsert();
+    }
+
+    private String buildInstanceInsert() {
+        return String.format(defaultInsert,classData.getTableName(), classData.getAllColumns(), classData.getAllColumnsPrepared());
     }
 
     public void populateColumn(String col, Connection connection) throws Exception {
@@ -245,7 +247,15 @@ public class DBObject<E extends DBObject<E, P>, P> implements DBValidation {
     protected void create(Connection connection, ClassMetadata classData) throws Exception {
         validateCreate(connection);
         setBlankValues(connection, classData);
-        DBUtils.execute(getInsertQuery(classData), connection);
+        try (PreparedStatement statement = connection.prepareStatement(instanceInsert)) {
+            int i = 1;
+            for (String col: classData.getColumnNames()){
+                statement.setObject(i, classData.getFieldMetadata(col).valueIn(this));
+                i++;
+            }
+            System.out.println(statement);
+            statement.execute();
+        }
     }
 
     private void setBlankValues(Connection connection) throws SQLException, DatabaseException, ReflectiveOperationException {

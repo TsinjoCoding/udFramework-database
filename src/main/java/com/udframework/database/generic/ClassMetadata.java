@@ -271,4 +271,12 @@ public class ClassMetadata {
         return primaryKey.getValueIn(obj);
     }
 
+    public String getAllColumnsPrepared() {
+        String str = "";
+        for(String col: getColumnNames()) {
+            str = str + "? ,";
+        }
+        str = str.substring(0, str.length() - 2);
+        return str;
+    }
 }
