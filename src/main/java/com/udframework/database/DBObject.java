@@ -14,9 +14,11 @@ import com.udframework.database.generic.relationTypes.RelationType;
 import com.udframework.database.generic.utils.StringUtils;
 
 import java.lang.annotation.Annotation;
+import java.nio.channels.ScatteringByteChannel;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 
 public class DBObject<E extends DBObject<E, P>, P> implements DBValidation {
 
@@ -30,16 +32,23 @@ public class DBObject<E extends DBObject<E, P>, P> implements DBValidation {
     protected final ClassMetadata classData;
 
     final FieldMetadata pk;
-    final String instanceSelect, instanceInsert;
+    final String instanceSelect;
 
-    public DBObject() throws DatabaseException, NoSuchMethodException {
-        classData = ClassMetadata.getMetadataOf(getClass());
-        pk = classData.getPrimaryKey();
-        instanceSelect = String.format(defaultSelect, classData.getAllColumns(), classData.getTableName());
-        instanceInsert = buildInstanceInsert();
+    public DBObject() throws DatabaseException {
+        try {
+            classData = ClassMetadata.getMetadataOf(getClass());
+            pk = classData.getPrimaryKey();
+            instanceSelect = String.format(defaultSelect, classData.getAllColumns(), classData.getTableName());
+        }
+        catch (DatabaseException e) {
+            throw e;
+        }
+        catch (Exception e) {
+            throw new DatabaseException(e);
+        }
     }
 
-    private String buildInstanceInsert() {
+    private String buildInstanceInsert(ClassMetadata classData) {
         return String.format(defaultInsert,classData.getTableName(), classData.getAllColumns(), classData.getAllColumnsPrepared());
     }
 
@@ -247,7 +256,7 @@ public class DBObject<E extends DBObject<E, P>, P> implements DBValidation {
     protected void create(Connection connection, ClassMetadata classData) throws Exception {
         validateCreate(connection);
         setBlankValues(connection, classData);
-        try (PreparedStatement statement = connection.prepareStatement(instanceInsert)) {
+        try (PreparedStatement statement = connection.prepareStatement(buildInstanceInsert(classData))) {
             int i = 1;
             for (String col: classData.getColumnNames()){
                 statement.setObject(i, classData.getFieldMetadata(col).valueIn(this));
@@ -286,7 +295,17 @@ public class DBObject<E extends DBObject<E, P>, P> implements DBValidation {
     public void update(Connection connection, ClassMetadata classData) throws Exception {
         if (classData.getPrimaryKey() == null) throw new DatabaseException("no primary key found");
         validateUpdate(connection);
-        DBUtils.execute(getUpdateQuery(classData), connection);
+        try(PreparedStatement statement = connection.prepareStatement(getUpdateQuery(classData))) {
+            int i = 1;
+            for (FieldMetadata field: classData.getListFields()) {
+                if (field.isPrimaryKey()) continue;
+                statement.setObject(i, field.getValueIn(this));
+                i++;
+            }
+            statement.setObject(i, classData.getPrimaryKey().getValueIn(this));
+            System.out.println(statement);
+            statement.execute();
+        }
     }
 
     private String getInsertQuery() throws DatabaseException, ReflectiveOperationException {
@@ -304,13 +323,11 @@ public class DBObject<E extends DBObject<E, P>, P> implements DBValidation {
     protected String getUpdateQuery(ClassMetadata classData) throws DatabaseException, ReflectiveOperationException {
         ArrayList<String> updates = new ArrayList<>();
 
-        HashMap<String, FieldMetadata> fields = classData.getFields();
+        List<FieldMetadata> fields = classData.getListFields();
 
-        for (String columnName : fields.keySet()) {
-            FieldMetadata fieldData = fields.get(columnName);
-
-            if (!fieldData.isPrimaryKey()) {
-                updates.add(columnName + " = " + ClassMetadata.valueToString(fieldData.valueIn(this)));
+        for (FieldMetadata field: fields) {
+            if (!field.isPrimaryKey()) {
+                updates.add(field.getColumnName() + " = ?");
             }
         }
 
@@ -318,7 +335,7 @@ public class DBObject<E extends DBObject<E, P>, P> implements DBValidation {
                 defaultUpdate,
                 classData.getTableName(),
                 updates.toString().substring(1, updates.toString().length() - 1),
-                getPrimaryKeyCondition(classData)
+                classData.getPrimaryKey().getColumnName() + "= ?"
         );
     }
 
