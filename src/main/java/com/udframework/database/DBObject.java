@@ -29,6 +29,7 @@ public class DBObject<E extends DBObject<E, P>, P> implements DBValidation {
     static final String defaultSelect = "select %s from %s";
     static final String defaultDelete = "delete from %s where %s";
     static final ObjectMapper mapper = new ObjectMapper();
+
     @JsonIgnore
     protected final ClassMetadata classData;
     final FieldMetadata pk;
