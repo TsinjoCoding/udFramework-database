@@ -82,16 +82,7 @@ public class ClassMetadata {
     }
 
     public String columnsWithoutPK() {
-        StringBuilder column = new StringBuilder();
-        String[] columns = getColumnNames();
-        column.append(StringUtils.wrap(columns[0]));
-
-        for (int i = 1; i < columns.length; i++) {
-            if(primaryKey.columnName.compareTo(columns[i]) == 0) continue;
-            column.append(" , ").append(StringUtils.wrap(columns[i]));
-        }
-
-        return String.valueOf(column);
+        return columnsWithout(primaryKey.columnName);
     }
 
     public String getAllColumns() {
@@ -279,4 +270,23 @@ public class ClassMetadata {
         str = str.substring(0, str.length() - 2);
         return str;
     }
+
+    public String columnsWithoutFK() {
+       return columnsWithout(fk.getColumnName());
+    }
+
+    private String columnsWithout(String col) {
+        StringBuilder column = new StringBuilder();
+        String[] columns = getColumnNames();
+
+        for (String s : columns) {
+            if (col.compareTo(s) == 0) {
+                continue;
+            }
+            column.append(" , ").append(StringUtils.wrap(s));
+        }
+
+        return String.valueOf(column.substring(2));
+    }
+
 }

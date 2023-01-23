@@ -28,8 +28,8 @@ public class DBInherit<E extends DBInherit<E,P>,P> extends DBObject<E, P>{
     private void setJoinedFields() {
         if (active) {
             ArrayList<FieldMetadata> joined = new ArrayList<>();
-            Collections.addAll(joined, classData.getListFields().toArray(new FieldMetadata[0]));
-            for (FieldMetadata field : superData.getListFields()) {
+            Collections.addAll(joined, superData.getListFields().toArray(new FieldMetadata[0]));
+            for (FieldMetadata field : classData.getListFields()) {
                 if (field instanceof FKField) continue;
                 joined.add(field);
             }
@@ -39,7 +39,7 @@ public class DBInherit<E extends DBInherit<E,P>,P> extends DBObject<E, P>{
 
     private String buildFullSelect() {
         if (active) {
-            String columns = "\"" + classData.getTableName() + "\".\"" + classData.getPrimaryKey().getColumnName() + "\", " + classData.columnsWithoutPK() + ", " + superData.columnsWithoutPK();
+            String columns = classData.columnsWithoutFK() + ", " + superData.getAllColumns();
             String table = classData.getTableName() + " join " + superData.getTableName() +
                     " on " + classData.getTableName() + "." + classData.getFk().getColumnName() +
                     " = " + superData.getTableName() + "." + superData.getPrimaryKey().getColumnName();
