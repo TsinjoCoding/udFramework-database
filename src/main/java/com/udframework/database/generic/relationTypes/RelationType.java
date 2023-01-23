@@ -32,4 +32,5 @@ public enum RelationType {
     public boolean isOne() {
         return this == OneToOne;
     }
+
 }

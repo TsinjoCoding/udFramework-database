@@ -3,6 +3,7 @@ package com.udframework.database;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.udframework.database.annotations.ManyToMany;
+import com.udframework.database.annotations.ManyToOne;
 import com.udframework.database.annotations.OneToMany;
 import com.udframework.database.annotations.OneToOne;
 import com.udframework.database.connectionHandler.ConnectionHandler;
@@ -28,7 +29,7 @@ public class DBObject<E extends DBObject<E, P>, P> implements DBValidation {
     static final String defaultDelete = "delete from %s where %s";
 
     @JsonIgnore
-    protected final ClassMetadata classData;
+    final ClassMetadata classData;
 
     final FieldMetadata pk;
     final String instanceSelect;
@@ -38,17 +39,15 @@ public class DBObject<E extends DBObject<E, P>, P> implements DBValidation {
             classData = ClassMetadata.getMetadataOf(getClass());
             pk = classData.getPrimaryKey();
             instanceSelect = String.format(defaultSelect, classData.getAllColumns(), classData.getTableName());
-        }
-        catch (DatabaseException e) {
+        } catch (DatabaseException e) {
             throw e;
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             throw new DatabaseException(e);
         }
     }
 
     private String buildInstanceInsert(ClassMetadata classData) {
-        return String.format(defaultInsert,classData.getTableName(), classData.getAllColumns(), classData.getAllColumnsPrepared());
+        return String.format(defaultInsert, classData.getTableName(), classData.getAllColumns(), classData.getAllColumnsPrepared());
     }
 
     public void populateColumn(String col, Connection connection) throws Exception {
@@ -68,8 +67,7 @@ public class DBObject<E extends DBObject<E, P>, P> implements DBValidation {
         }
     }
 
-    public void populateField(String field, Connection connection)
-            throws DatabaseException, ReflectiveOperationException, SQLException {
+    public void populateField(String field, Connection connection) throws DatabaseException, ReflectiveOperationException, SQLException {
         RelationField relationField = classData.relations.get(field.toLowerCase());
         if (relationField == null) {
             throw new DatabaseException(String.format("%s cannot be populated", field));
@@ -78,8 +76,7 @@ public class DBObject<E extends DBObject<E, P>, P> implements DBValidation {
         relationField.setValueIn(this, value);
     }
 
-    private Object valueFrom(RelationField relationField, Connection connection)
-            throws DatabaseException, ReflectiveOperationException, SQLException {
+    private Object valueFrom(RelationField relationField, Connection connection) throws DatabaseException, ReflectiveOperationException, SQLException {
         RelationType relationType = relationField.getRelationType();
 
         if (relationType.isOne()) {
@@ -90,7 +87,7 @@ public class DBObject<E extends DBObject<E, P>, P> implements DBValidation {
             // instance of the field value
             ArrayList<?> result = ((DBObject<?, ?>) cm.newInstance())
                     .fetchAll(connection)
-                    .where(String.format("%s='%s'", StringUtils.wrap(oneT1.joinTo().toLowerCase()), from.valueIn(this)))
+                    .isEqual(oneT1.joinTo().toLowerCase(), from.valueIn(this))
                     .run();
             return result.size() == 0 ? null : (DBObject<?, ?>) result.get(0);
         }
@@ -99,7 +96,6 @@ public class DBObject<E extends DBObject<E, P>, P> implements DBValidation {
     }
 
     private Object valuesFrom(RelationField relationField, Connection connection) throws DatabaseException, ReflectiveOperationException, SQLException {
-        String subQuery;
         ClassMetadata cd;
         DBObject<?, ?> obj;
         RelationType type = relationField.getRelationType();
@@ -108,38 +104,20 @@ public class DBObject<E extends DBObject<E, P>, P> implements DBValidation {
         if (annotation instanceof OneToMany) {
             OneToMany oneTM = (OneToMany) annotation;
             cd = ClassMetadata.getMetadataOf(oneTM.elt());
-            subQuery = String.format(defaultSelect, cd.getPrimaryKey().getColumnName(), cd.getTableName());
-            subQuery = subQuery + String.format(
-                " where %s = '%s'",
-                StringUtils.wrap(oneTM.to()),
-                classData.getFieldMetadata(oneTM.from()).valueIn(this)
-            );
-        } else {
-            ManyToMany mTm = (ManyToMany) annotation;
-            cd = ClassMetadata.getMetadataOf(mTm.elt());
+            obj = (DBObject<?, ?>) cd.newInstance();
 
-            subQuery = "select %s from %s t1 join %s t2 on t1.%s = t2.%s where t2.%s = '%s'";
-            subQuery = String.format(
-                subQuery,
-                StringUtils.wrap(mTm.extern().from()),
-                StringUtils.wrap(cd.getTableName()),
-                StringUtils.wrap(mTm.linkTable()),
-                StringUtils.wrap(mTm.extern().from()),
-                StringUtils.wrap(mTm.extern().to()),
-                StringUtils.wrap(mTm.intern().to()),
-                classData.getFieldMetadata(mTm.intern().from()).valueIn(this)
-            );
+            return obj.fetchAll(connection)
+                    .isEqual(oneTM.to(), classData.getFieldMetadata(oneTM.from()).valueIn(this))
+                    .run();
         }
 
+        ManyToMany mTm = (ManyToMany) annotation;
+        cd = ClassMetadata.getMetadataOf(mTm.elt());
+        String query = "select " + cd.getAllColumns() + " from " + cd.getTableName() + " t1 join " + mTm.linkTable() + " t2 on t1." + mTm.extern().from() + " = t2." + mTm.extern().to() + " where t2." + mTm.intern().to() + " = ?";
         obj = (DBObject<?, ?>) cd.newInstance();
-
-        return obj.fetchAll(connection)
-                .where(
-            String.format(
-                    " %s in ( %s )",
-                    cd.getPrimaryKey().getColumnName(),
-                    subQuery)
-                ).run();
+        List<Object> values = new ArrayList<>();
+        values.add(classData.getFieldMetadata(mTm.intern().from()).valueIn(this));
+        return obj.runQuery(query, values, connection);
     }
 
     public P nextGeneratedValue(String columnName, Connection connection) throws SQLException, DatabaseException {
@@ -162,7 +140,7 @@ public class DBObject<E extends DBObject<E, P>, P> implements DBValidation {
 
     protected E findById(Connection connection, P id, ClassMetadata classData) throws Exception {
         if (pk == null) throw new DatabaseException("no primary key found");
-        ArrayList<E> results = fetchAll(connection, classData).where(String.format("%s='%s'", classData.getPrimaryKey().getColumnName(), id)).run();
+        ArrayList<E> results = fetchAll(connection, classData).isEqual(classData.getPrimaryKey().getColumnName(), id).run();
         return results.size() == 0 ? null : results.get(0);
     }
 
@@ -237,7 +215,7 @@ public class DBObject<E extends DBObject<E, P>, P> implements DBValidation {
 
     protected String getDeleteQuery(ClassMetadata classData) throws ReflectiveOperationException, DatabaseException {
         if (classData.getDeleteTable().isEmpty()) {
-            return String.format(defaultDelete, classData.getTableName(), classData.getPrimaryKey().getColumnName() +" = ?");
+            return String.format(defaultDelete, classData.getTableName(), classData.getPrimaryKey().getColumnName() + " = ?");
         }
         return String.format(defaultInsert, classData.getDeleteTable(), classData.getDeleteColumn(), "?");
     }
@@ -257,7 +235,7 @@ public class DBObject<E extends DBObject<E, P>, P> implements DBValidation {
         setBlankValues(connection, classData);
         try (PreparedStatement statement = connection.prepareStatement(buildInstanceInsert(classData))) {
             int i = 1;
-            for (String col: classData.getColumnNames()){
+            for (String col : classData.getColumnNames()) {
                 statement.setObject(i, classData.getFieldMetadata(col).valueIn(this));
                 i++;
             }
@@ -294,9 +272,9 @@ public class DBObject<E extends DBObject<E, P>, P> implements DBValidation {
     public void update(Connection connection, ClassMetadata classData) throws Exception {
         if (classData.getPrimaryKey() == null) throw new DatabaseException("no primary key found");
         validateUpdate(connection);
-        try(PreparedStatement statement = connection.prepareStatement(getUpdateQuery(classData))) {
+        try (PreparedStatement statement = connection.prepareStatement(getUpdateQuery(classData))) {
             int i = 1;
-            for (FieldMetadata field: classData.getListFields()) {
+            for (FieldMetadata field : classData.getListFields()) {
                 if (field.isPrimaryKey()) continue;
                 statement.setObject(i, field.getValueIn(this));
                 i++;
@@ -324,7 +302,7 @@ public class DBObject<E extends DBObject<E, P>, P> implements DBValidation {
 
         List<FieldMetadata> fields = classData.getListFields();
 
-        for (FieldMetadata field: fields) {
+        for (FieldMetadata field : fields) {
             if (!field.isPrimaryKey()) {
                 updates.add(field.getColumnName() + " = ?");
             }
@@ -355,14 +333,20 @@ public class DBObject<E extends DBObject<E, P>, P> implements DBValidation {
         return pk.getColumnName() + " = " + ClassMetadata.valueToString(pk.valueIn(this));
     }
 
-    protected ArrayList<E> runQuery(String query, Connection connection) throws SQLException, ReflectiveOperationException, DatabaseException {
-        return runQuery(query, connection, this.classData.getListFields().toArray(new FieldMetadata[0]));
+    protected ArrayList<E> runQuery(String query, List<Object> values, Connection connection) throws SQLException, ReflectiveOperationException, DatabaseException {
+        return runQuery(query, values, connection, this.classData.getListFields().toArray(new FieldMetadata[0]));
     }
 
-    protected ArrayList<E> runQuery(String query, Connection connection, FieldMetadata... fields) throws SQLException, ReflectiveOperationException, DatabaseException {
+    protected ArrayList<E> runQuery(String query, List<Object> values, Connection connection, FieldMetadata... fields) throws SQLException, ReflectiveOperationException, DatabaseException {
         ArrayList<E> results = new ArrayList<>();
-        try (Statement statement = connection.createStatement()) {
-            try (ResultSet resultSet = statement.executeQuery(query)) {
+        try (PreparedStatement statement = connection.prepareStatement(query)) {
+            int i = 1;
+            for (Object value : values) {
+                statement.setObject(i, value);
+                i++;
+            }
+            System.out.println(statement);
+            try (ResultSet resultSet = statement.executeQuery()) {
                 while (resultSet.next()) {
                     E result = (E) classData.newInstance();
                     for (FieldMetadata field : fields) {

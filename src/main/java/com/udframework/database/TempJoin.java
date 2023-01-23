@@ -19,7 +19,7 @@ public class TempJoin<E extends DBInherit> extends Temp<E> {
     @Override
     public ArrayList<E> run() throws ReflectiveOperationException, SQLException, DatabaseException {
         try {
-            return obj.runQuery(buildQuery(), connection, fields);
+            return obj.runQuery(buildQuery(), getValues(),  connection, fields);
         }
         finally {
             if (closeConnection) {
