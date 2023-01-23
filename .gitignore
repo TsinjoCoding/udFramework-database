@@ -1,3 +1,5 @@
 /target/
 /.idea/
 /src/test/
+/spring/SpringDBObject/.idea/
+/spring/SpringDBObject/target/
