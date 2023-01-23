@@ -26,7 +26,6 @@ public class DBObject<E extends DBObject<E, P>, P> implements DBValidation {
     static final String defaultUpdate = "Update %s set %s where %s";
     static final String defaultSelect = "select %s from %s";
     static final String defaultDelete = "delete from %s where %s";
-    static final ObjectMapper mapper = new ObjectMapper();
 
     @JsonIgnore
     protected final ClassMetadata classData;
@@ -229,18 +228,18 @@ public class DBObject<E extends DBObject<E, P>, P> implements DBValidation {
     public void delete(Connection connection, ClassMetadata classData) throws Exception {
         if (classData.getPrimaryKey() == null) throw new DatabaseException("no primary key found");
         validateDelete(connection);
-        DBUtils.execute(getDeleteQuery(classData), connection);
-    }
-
-    private String getDeleteQuery() throws ReflectiveOperationException, DatabaseException {
-        return getDeleteQuery(this.classData);
+        try (PreparedStatement statement = connection.prepareStatement(getDeleteQuery(classData))) {
+            statement.setObject(1, getPkValue());
+            System.out.println(statement);
+            statement.execute();
+        }
     }
 
     protected String getDeleteQuery(ClassMetadata classData) throws ReflectiveOperationException, DatabaseException {
         if (classData.getDeleteTable().isEmpty()) {
-            return String.format(defaultDelete, classData.getTableName(), getPrimaryKeyCondition(classData));
+            return String.format(defaultDelete, classData.getTableName(), classData.getPrimaryKey().getColumnName() +" = ?");
         }
-        return String.format(defaultInsert, classData.getDeleteTable(), classData.getDeleteColumn(), getPkValue(classData));
+        return String.format(defaultInsert, classData.getDeleteTable(), classData.getDeleteColumn(), "?");
     }
 
     public void create() throws Exception {
