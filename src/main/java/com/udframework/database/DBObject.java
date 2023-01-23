@@ -120,10 +120,6 @@ public class DBObject<E extends DBObject<E, P>, P> implements DBValidation {
         return obj.runQuery(query, values, connection);
     }
 
-    public P nextGeneratedValue(String columnName, Connection connection) throws SQLException, DatabaseException {
-        return nextGeneratedValue(columnName, this.classData, connection);
-    }
-
     public P nextGeneratedValue(String columnName, ClassMetadata classData, Connection connection) throws DatabaseException, SQLException {
         Long seq = callSequence(classData.getFieldMetadata(columnName), connection);
         FieldMetadata field = classData.getFieldMetadata(columnName);

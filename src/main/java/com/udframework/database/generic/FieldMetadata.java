@@ -184,7 +184,7 @@ public class FieldMetadata extends DBField {
     public void setDefaultIn(DBObject<?, ?> obj, ClassMetadata classData, Connection connection) throws SQLException, DatabaseException, ReflectiveOperationException {
         if (!isGenerated()) return;
         Class<?> valType = isGeneratedString() ? String.class : Long.class;
-        Object generatedValue = obj.nextGeneratedValue(columnName, connection);
+        Object generatedValue = obj.nextGeneratedValue(columnName, classData, connection);
         setValue(obj, generatedValue);
     }
 
