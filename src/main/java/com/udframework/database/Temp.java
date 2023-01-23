@@ -8,7 +8,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 
 import com.udframework.database.exceptions.DatabaseException;
-import org.apache.commons.lang3.StringEscapeUtils;
 
 public class Temp <E extends DBObject> {
     final E obj;
@@ -32,13 +31,9 @@ public class Temp <E extends DBObject> {
         this.obj = obj;
     }
 
-//    private Temp<E> compare(Operator op, String col, Object value) {
-//        return String.format("\"%s\"", StringEscapeUtils.escape)
-//        return this;
-//    }
 
-    public Temp<E> where (String col, Object value) {
-        this.conditions.add(col + " = '" + value + "'");
+    public Temp<E> where (String cond) {
+        this.conditions.add(cond);
         return this;
     }
 
