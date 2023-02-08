@@ -272,7 +272,7 @@ public class DBObject<E extends DBObject<E, P>, P> implements DBValidation {
             int i = 1;
             for (FieldMetadata field : classData.getListFields()) {
                 if (field.isPrimaryKey()) continue;
-                statement.setObject(i, field.getValueIn(this));
+                statement.setObject(i, field.valueIn(this));
                 i++;
             }
             statement.setObject(i, classData.getPrimaryKey().getValueIn(this));
